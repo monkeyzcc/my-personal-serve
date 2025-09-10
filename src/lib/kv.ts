@@ -71,6 +71,35 @@ async function ensureRedisReady(client: Redis): Promise<void> {
   }
 }
 
+async function withRedisRetry<T>(
+  client: Redis,
+  action: () => Promise<T>,
+  opts: { attempts?: number; baseDelayMs?: number } = {}
+): Promise<T> {
+  const attempts = opts.attempts ?? 3;
+  const baseDelayMs = opts.baseDelayMs ?? 50;
+  let lastErr: unknown = null;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      await ensureRedisReady(client);
+      return await action();
+    } catch (e) {
+      lastErr = e;
+      const msg = (e as Error)?.message || '';
+      const isStreamNotWriteable = msg.includes("Stream isn't writeable") || msg.includes('writeable');
+      const isCommandQueueError = msg.includes('enableOfflineQueue options is false');
+      const shouldRetry = isStreamNotWriteable || isCommandQueueError || client.status !== 'ready';
+      if (i < attempts - 1 && shouldRetry) {
+        const delay = baseDelayMs * Math.pow(2, i);
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw lastErr as Error;
+}
+
 export type ScrapeRecord = {
   id: string;
   ok: boolean;
@@ -92,8 +121,7 @@ export async function setLatestScrapeRecord(record: ScrapeRecord): Promise<void>
     try {
       const t0 = Date.now();
       console.log('[kv] set via redis', SCRAPE_LATEST_KEY, 'bytes', payload.length);
-      await ensureRedisReady(redis);
-      await redis.set(SCRAPE_LATEST_KEY, payload);
+      await withRedisRetry(redis, () => redis.set(SCRAPE_LATEST_KEY, payload));
       console.log('[kv] set via redis ok in', Date.now() - t0, 'ms');
       return;
     } catch (e) {
@@ -123,8 +151,7 @@ export async function getLatestScrapeRecord(): Promise<ScrapeRecord | null> {
     try {
       const t0 = Date.now();
       console.log('[kv] get via redis', SCRAPE_LATEST_KEY);
-      await ensureRedisReady(redis);
-      const raw = await redis.get(SCRAPE_LATEST_KEY);
+      const raw = await withRedisRetry(redis, () => redis.get(SCRAPE_LATEST_KEY));
       console.log('[kv] get via redis', raw ? 'HIT' : 'MISS', 'in', Date.now() - t0, 'ms');
       return raw ? (JSON.parse(raw) as ScrapeRecord) : null;
     } catch (e) {
