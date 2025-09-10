@@ -11,7 +11,7 @@
 
 1. Fork 或导入本仓库到你的 Git 平台（或直接点击上面的按钮）
 2. 在 Vercel 导入项目，框架选择 Next.js，Node 18+
-3. 在 Vercel → Integrations 启用 Vercel KV，并把以下环境变量填好（见下文「Vercel KV 配置」）：
+3. 在 Vercel → Integrations 启用 Vercel KV，或直接使用你自己的 Redis（见下文「持久化配置」）：
    - SCRAPER_TARGET_URL（例如 `https://www.theblockbeats.info/dataview`）
    - WEBHOOK_URL (可选)
 4. 部署后，Vercel 会根据 `vercel.json` 的 `crons` 每天调用一次 `/api/tools/scraper/run`
@@ -27,9 +27,16 @@ pnpm dev
 
 参见 `.env.example`。
 
-## Vercel KV 配置
+## 持久化配置
 
-Vercel KV 基于 Upstash Redis 提供 KV 能力。本项目使用 `@vercel/kv` 进行读写。按以下步骤完成配置：
+本项目同时支持两种方式：
+
+- 使用 Vercel KV（基于 Upstash Redis）通过 `@vercel/kv` 读写
+- 使用标准 Redis 连接串（例如 Vercel Redis / Redis Cloud）通过 `ioredis` 直连
+
+推荐优先顺序：`REDIS_URL` 或 `KV_URL`（直连） → `KV_REST_API_URL`/`KV_REST_API_TOKEN`（REST） → 内存（仅开发兜底）。
+
+### 方式一：Vercel KV（REST + 可选直连）
 
 1. 在 Vercel 项目中打开 Integrations，安装并启用「Vercel KV」。
 2. 创建一个新的 KV 数据库或选择已有的数据库，绑定到当前项目与对应的环境（Production / Preview / Development）。
@@ -41,9 +48,22 @@ Vercel KV 基于 Upstash Redis 提供 KV 能力。本项目使用 `@vercel/kv` �
 4. 在项目的 Environment Variables 中确认上述变量已存在（不同环境需分别配置）。
 5. 重新部署项目，使新环境变量生效。
 
+### 方式二：标准 Redis（直连）
+
+设置以下环境变量中的任意一个：
+
+- `REDIS_URL`：标准 Redis 连接串，例如 `redis://default:<password>@<host>:<port>`
+- `KV_URL`：若你已启用 Vercel KV，也可以用其直连 URL
+
+示例：
+
+```
+REDIS_URL="redis://default:******@redis-xxxxx.cxxx.us-east-1-x.ec2.redns.redis-cloud.com:xxxxx"
+```
+
 本项目关于 KV 的实现位于：
 
-- `src/lib/kv.ts`：封装 `@vercel/kv` 的读写逻辑，会根据 `KV_REST_API_URL` 和 `KV_REST_API_TOKEN` 判断是否已配置。
+- `src/lib/kv.ts`：封装持久化逻辑，优先走 Redis 直连（`REDIS_URL`/`KV_URL`），否则使用 `@vercel/kv` 的 REST；最后回退到内存。
 - `src/app/api/tools/scraper/*`：抓取器会把结果写入 KV 并提供查询接口。
 
 常见问题：
