@@ -2,6 +2,7 @@ export const env = {
   SCRAPER_TARGET_URL: process.env.SCRAPER_TARGET_URL ?? '',
   SCRAPER_CRON_SCHEDULE: process.env.SCRAPER_CRON_SCHEDULE ?? '0 0 * * *',
   WEBHOOK_URL: process.env.WEBHOOK_URL ?? '',
+  FEISHU_WEBHOOK_SECRET: process.env.FEISHU_WEBHOOK_SECRET ?? '',
   KV_REST_API_URL: process.env.KV_REST_API_URL ?? '',
   KV_REST_API_TOKEN: process.env.KV_REST_API_TOKEN ?? '',
   KV_REST_API_READ_ONLY_TOKEN: process.env.KV_REST_API_READ_ONLY_TOKEN ?? '',

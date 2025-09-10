@@ -3,32 +3,30 @@ import { kv } from '@vercel/kv';
 const isKvConfigured = Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
 
 export type ScrapeRecord = {
-  id: string; // timestamp id
+  id: string;
   ok: boolean;
   url: string;
   status: number;
   extractedText: string;
-  createdAt: string; // ISO
+  createdAt: string;
 };
 
-const SCRAPE_LIST_KEY = 'scraper:records';
-const memoryStore: ScrapeRecord[] = [];
+const SCRAPE_LATEST_KEY = 'scraper:latest';
+let memoryLatest: ScrapeRecord | null = null;
 
-export async function addScrapeRecord(record: ScrapeRecord): Promise<void> {
+export async function setLatestScrapeRecord(record: ScrapeRecord): Promise<void> {
   if (!isKvConfigured) {
-    memoryStore.unshift(record);
-    if (memoryStore.length > 200) memoryStore.length = 200;
+    memoryLatest = record;
     return;
   }
-  await kv.lpush(SCRAPE_LIST_KEY, JSON.stringify(record));
-  await kv.ltrim(SCRAPE_LIST_KEY, 0, 199); // keep latest 200
+  await kv.set(SCRAPE_LATEST_KEY, JSON.stringify(record));
 }
 
-export async function getRecentScrapeRecords(limit = 20): Promise<ScrapeRecord[]> {
+export async function getLatestScrapeRecord(): Promise<ScrapeRecord | null> {
   if (!isKvConfigured) {
-    return memoryStore.slice(0, limit);
+    return memoryLatest;
   }
-  const raw = await kv.lrange<string>(SCRAPE_LIST_KEY, 0, limit - 1);
-  return raw.map((s) => JSON.parse(s) as ScrapeRecord);
+  const raw = await kv.get<string | null>(SCRAPE_LATEST_KEY);
+  return raw ? (JSON.parse(raw) as ScrapeRecord) : null;
 }
 
