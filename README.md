@@ -14,7 +14,7 @@
 3. 在 Vercel → Integrations 启用 Vercel KV，并把以下环境变量填好：
    - SCRAPER_TARGET_URL（例如 `https://www.theblockbeats.info/dataview`）
    - WEBHOOK_URL (可选)
-4. 部署后，Vercel 会根据 `vercel.json` 的 `crons` 每小时调用 `/api/tools/scraper/run`
+4. 部署后，Vercel 会根据 `vercel.json` 的 `crons` 每天调用一次 `/api/tools/scraper/run`
 
 ## 本地开发
 
