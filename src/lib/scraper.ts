@@ -1,6 +1,6 @@
 import * as cheerio from 'cheerio';
 import { env } from './env';
-import { addScrapeRecord, type ScrapeRecord } from './kv';
+import { setLatestScrapeRecord, type ScrapeRecord } from './kv';
 
 export async function runScrapeOnce(): Promise<ScrapeRecord> {
   if (!env.SCRAPER_TARGET_URL) {
@@ -53,23 +53,34 @@ export async function runScrapeOnce(): Promise<ScrapeRecord> {
     createdAt: new Date().toISOString()
   };
 
-  await addScrapeRecord(record);
+  await setLatestScrapeRecord(record);
 
   if (res.ok && env.WEBHOOK_URL) {
     try {
-      await fetch(env.WEBHOOK_URL, {
+      const msg = `抓取成功\nURL: ${env.SCRAPER_TARGET_URL}\n状态: ${res.status}\n时间: ${record.createdAt}`;
+      const payload: Record<string, unknown> = {
+        msg_type: 'text',
+        content: { text: msg }
+      };
+      if (env.FEISHU_WEBHOOK_SECRET) {
+        const ts = Math.floor(Date.now() / 1000);
+        const signBase = `${ts}\n${env.FEISHU_WEBHOOK_SECRET}`;
+        const crypto = await import('node:crypto');
+        const hmac = crypto.createHmac('sha256', env.FEISHU_WEBHOOK_SECRET).update(signBase).digest('base64');
+        (payload as any).timestamp = String(ts);
+        (payload as any).sign = hmac;
+      }
+      const hookRes = await fetch(env.WEBHOOK_URL, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          type: 'scrape.success',
-          url: env.SCRAPER_TARGET_URL,
-          status: res.status,
-          createdAt: record.createdAt,
-          content: text
-        })
+        body: JSON.stringify(payload)
       });
-    } catch {
-      // ignore webhook errors
+      if (!hookRes.ok) {
+        const errText = await hookRes.text().catch(() => '');
+        console.warn('[webhook] non-200', hookRes.status, errText);
+      }
+    } catch (e) {
+      console.warn('[webhook] send error', (e as Error).message);
     }
   }
 
