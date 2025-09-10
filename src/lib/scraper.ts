@@ -57,10 +57,9 @@ export async function runScrapeOnce(): Promise<ScrapeRecord> {
 
   if (res.ok && env.WEBHOOK_URL) {
     try {
-      const msg = `抓取成功\nURL: ${env.SCRAPER_TARGET_URL}\n状态: ${res.status}\n时间: ${record.createdAt}`;
       const payload: Record<string, unknown> = {
         msg_type: 'text',
-        content: { text: msg }
+        content: { text: record.extractedText }
       };
       if (env.FEISHU_WEBHOOK_SECRET) {
         const ts = Math.floor(Date.now() / 1000);
