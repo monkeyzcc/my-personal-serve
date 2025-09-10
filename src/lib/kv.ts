@@ -28,7 +28,8 @@ function getRedisClient(): Redis | null {
   console.log('[kv] init ioredis', maskRedisUrl(directRedisUrl));
   redisClient = new Redis(directRedisUrl, {
     maxRetriesPerRequest: 2,
-    enableOfflineQueue: false
+    enableOfflineQueue: false,
+    lazyConnect: true
   });
   redisClient.on('connect', () => console.log('[kv] redis connect', maskRedisUrl(directRedisUrl)));
   redisClient.on('ready', () => console.log('[kv] redis ready', maskRedisUrl(directRedisUrl)));
@@ -36,6 +37,38 @@ function getRedisClient(): Redis | null {
   redisClient.on('reconnecting', (delay: number) => console.log('[kv] redis reconnecting in', delay, 'ms'));
   redisClient.on('error', (e: Error) => console.warn('[kv] redis error', (e as Error).message));
   return redisClient;
+}
+
+async function ensureRedisReady(client: Redis): Promise<void> {
+  if (client.status === 'ready') return;
+  const waitForReady = () =>
+    new Promise<void>((resolve, reject) => {
+      const onReady = () => {
+        cleanup();
+        resolve();
+      };
+      const onError = (e: Error) => {
+        cleanup();
+        reject(e);
+      };
+      const cleanup = () => {
+        client.off('ready', onReady);
+        client.off('error', onError);
+      };
+      client.once('ready', onReady);
+      client.once('error', onError);
+    });
+  if (client.status === 'wait') {
+    // Lazy client hasn't connected yet
+    try {
+      await client.connect();
+    } catch (e) {
+      // connect() may fail; wait for error/ready handlers to settle
+    }
+  }
+  if (client.status !== 'ready') {
+    await waitForReady();
+  }
 }
 
 export type ScrapeRecord = {
@@ -59,6 +92,7 @@ export async function setLatestScrapeRecord(record: ScrapeRecord): Promise<void>
     try {
       const t0 = Date.now();
       console.log('[kv] set via redis', SCRAPE_LATEST_KEY, 'bytes', payload.length);
+      await ensureRedisReady(redis);
       await redis.set(SCRAPE_LATEST_KEY, payload);
       console.log('[kv] set via redis ok in', Date.now() - t0, 'ms');
       return;
@@ -89,6 +123,7 @@ export async function getLatestScrapeRecord(): Promise<ScrapeRecord | null> {
     try {
       const t0 = Date.now();
       console.log('[kv] get via redis', SCRAPE_LATEST_KEY);
+      await ensureRedisReady(redis);
       const raw = await redis.get(SCRAPE_LATEST_KEY);
       console.log('[kv] get via redis', raw ? 'HIT' : 'MISS', 'in', Date.now() - t0, 'ms');
       return raw ? (JSON.parse(raw) as ScrapeRecord) : null;
