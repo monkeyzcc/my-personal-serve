@@ -51,6 +51,18 @@ Vercel KV 基于 Upstash Redis 提供 KV 能力。本项目使用 `@vercel/kv` �
 - 若未配置 KV 或变量缺失，相关功能会自动跳过写入，避免运行时错误；请检查 Integrations 与环境变量是否齐全。
 - 免费额度有限，若频率高请在 Upstash 控制台或 Vercel 账单中确认配额。
 
+### 使用 Redis 直连（可选）
+
+如果你已有自建或第三方 Redis 实例（如 Redis Cloud），可直接通过 `REDIS_URL` 连接，项目会优先使用直连，其次才回退到 Vercel KV（REST），最后回退到内存存储：
+
+1. 在项目环境变量中新增：
+   - `REDIS_URL`（例如：`redis://default:<password>@<host>:<port>`）
+   - 或者使用 `KV_URL` 也可（优先级与 `REDIS_URL` 相同）
+2. 确认 API Route 运行时为 Node.js。项目中的相关路由已显式设置 `export const runtime = 'nodejs'`，可安全使用原生 TCP 直连客户端。
+3. 重新部署使配置生效。
+
+说明：直连模式使用 `ioredis` 实现；变量未配置时自动使用 `@vercel/kv`（REST）；两者都未配置时仅在内存中保存最近一次抓取结果。
+
 ## 目录结构
 
 - `src/app` 应用入口、页面与 API Routes
