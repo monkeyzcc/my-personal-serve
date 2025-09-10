@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getRecentScrapeRecords } from '@/lib/kv';
+import { getLatestScrapeRecord } from '@/lib/kv';
 
 export const runtime = 'nodejs';
 
 export async function GET() {
-  const list = await getRecentScrapeRecords(50);
-  return NextResponse.json({ ok: true, list });
+  const latest = await getLatestScrapeRecord();
+  return NextResponse.json({ ok: true, latest });
 }
 
