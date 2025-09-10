@@ -10,13 +10,18 @@ export async function runScrapeOnce(): Promise<ScrapeRecord> {
   const start = Date.now();
   const res = await fetch(env.SCRAPER_TARGET_URL, {
     headers: { 'user-agent': 'PersonalToolboxBot/1.0 (+https://vercel.com)' },
-    cache: 'no-store',
-    next: { revalidate: 0 }
+    cache: 'no-store'
   });
 
   const html = await res.text();
   const $ = cheerio.load(html);
-  const text = $('body').text().replace(/\s+/g, ' ').trim().slice(0, 2000);
+  // Prefer extracting the specific target: div.macd-wrap under https://www.theblockbeats.info/dataview
+  // Fallback to body text when the target container is not present (e.g., client-rendered pages).
+  let extracted = $('div.macd-wrap').first().text().trim();
+  if (!extracted) {
+    extracted = $('body').text();
+  }
+  const text = extracted.replace(/\s+/g, ' ').trim().slice(0, 2000);
 
   const record: ScrapeRecord = {
     id: String(start),
