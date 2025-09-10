@@ -10,13 +10,39 @@ export async function runScrapeOnce(): Promise<ScrapeRecord> {
   const start = Date.now();
   const res = await fetch(env.SCRAPER_TARGET_URL, {
     headers: { 'user-agent': 'PersonalToolboxBot/1.0 (+https://vercel.com)' },
-    cache: 'no-store',
-    next: { revalidate: 0 }
+    cache: 'no-store'
   });
 
   const html = await res.text();
   const $ = cheerio.load(html);
-  const text = $('body').text().replace(/\s+/g, ' ').trim().slice(0, 2000);
+  // Prefer extracting the specific target: div.macd-wrap under https://www.theblockbeats.info/dataview
+  // Fallback to body text when the target container is not present (e.g., client-rendered pages).
+  const target = $('div.macd-wrap').first();
+  const root = target.length ? target : $('body').first();
+
+  // Convert HTML to plain text while preserving paragraph/line breaks.
+  const $clone = root.clone();
+  $clone.find('br').replaceWith('\n');
+  $clone
+    .find(
+      'p,div,li,ul,ol,h1,h2,h3,h4,h5,h6,tr,th,td,section,article,header,footer,aside,nav,blockquote,pre'
+    )
+    .each((_, el) => {
+      const node = $(el);
+      const t = node.text();
+      node.text(t + '\n');
+    });
+
+  const raw = $clone.text();
+  const normalized = raw
+    .replace(/\r\n/g, '\n')
+    .replace(/\u00A0/g, ' ')
+    .split('\n')
+    .map((line) => line.replace(/[\t ]+/g, ' ').trim())
+    .filter((line) => line.length > 0)
+    .join('\n');
+
+  const text = normalized.slice(0, 5000);
 
   const record: ScrapeRecord = {
     id: String(start),
@@ -38,7 +64,8 @@ export async function runScrapeOnce(): Promise<ScrapeRecord> {
           type: 'scrape.success',
           url: env.SCRAPER_TARGET_URL,
           status: res.status,
-          createdAt: record.createdAt
+          createdAt: record.createdAt,
+          content: text
         })
       });
     } catch {

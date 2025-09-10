@@ -7,10 +7,12 @@
 
 ## 一键部署
 
-1. Fork 或导入本仓库到你的 Git 平台
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fmonkeyzcc%2Fmy-personal-serve&project-name=personal-toolbox&repository-name=personal-toolbox&env=SCRAPER_TARGET_URL,WEBHOOK_URL)
+
+1. Fork 或导入本仓库到你的 Git 平台（或直接点击上面的按钮）
 2. 在 Vercel 导入项目，框架选择 Next.js，Node 18+
 3. 在 Vercel → Integrations 启用 Vercel KV，并把以下环境变量填好：
-   - SCRAPER_TARGET_URL
+   - SCRAPER_TARGET_URL（例如 `https://www.theblockbeats.info/dataview`）
    - WEBHOOK_URL (可选)
 4. 部署后，Vercel 会根据 `vercel.json` 的 `crons` 每小时调用 `/api/tools/scraper/run`
 
