@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "crons": [
+    {
+      "path": "/api/tools/scraper/run",
+      "schedule": "@hourly"
+    }
+  ]
+}
+
