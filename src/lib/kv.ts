@@ -28,7 +28,7 @@ function getRedisClient(): Redis | null {
   console.log('[kv] init ioredis', maskRedisUrl(directRedisUrl));
   redisClient = new Redis(directRedisUrl, {
     maxRetriesPerRequest: 2,
-    enableOfflineQueue: false
+    enableOfflineQueue: true
   });
   redisClient.on('connect', () => console.log('[kv] redis connect', maskRedisUrl(directRedisUrl)));
   redisClient.on('ready', () => console.log('[kv] redis ready', maskRedisUrl(directRedisUrl)));
